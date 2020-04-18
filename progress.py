@@ -1,20 +1,40 @@
-# command line progress
+# https://stackoverflow.com/questions/3173320/text-progress-bar-in-the-console
 
 
-import time
-import sys
+def printProgressBar (iteration, total, prefix='Progress:', suffix='Complete', decimals=1, length=50, fill ='█', printEnd="\r"):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = printEnd)
+    # Print New Line on Complete
+    if iteration == total: 
+        print()
 
-toolbar_width = 40
 
-# setup toolbar
-sys.stdout.write("[%s]" % (" " * toolbar_width))
-sys.stdout.flush()
-sys.stdout.write("\b" * (toolbar_width+1)) # return to start of line, after '['
 
-for i in range(toolbar_width):
-    time.sleep(0.1) # do real work here
-    # update the bar
-    sys.stdout.write("█")
-    sys.stdout.flush()
+if __name__ == "__main__":
+    import time
 
-sys.stdout.write("]\n") # this ends the progress bar
+# A List of Items
+    items = list(range(0, 100))
+    l = len(items)
+
+    # Initial call to print 0% progress
+    printProgressBar(0, l)
+    for i, item in enumerate(items):
+        # Do stuff...
+        time.sleep(0.1)
+        # Update Progress Bar
+        printProgressBar(i + 1, l)

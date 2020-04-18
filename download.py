@@ -3,6 +3,8 @@ import urllib.request
 
 from pytube import YouTube
 
+from progress import printProgressBar
+
 
 default_download_path = os.path.expanduser(r'~\Downloads')
 
@@ -15,6 +17,7 @@ class DownloadItem():
         self.save_as = ''
         self.status = ''
         self.is_video = video
+
 
 
     def download(self):
@@ -31,19 +34,21 @@ class DownloadItem():
         self.filename = yt.title
         yt.register_on_progress_callback(self.progress_video)
 
+        printProgressBar(0, 100)
+
         try:
             self.status = 'downloading'
             yt.streams.get_by_resolution(df_res).download(output_path=default_download_path)
             self.status = 'complete'
         except:
             yt.streams.get_highest_resolution().download(output_path=default_download_path)
-            print(f'downloading highesrt resolution possible')
+            # print(f'downloading highesrt resolution possible')
 
 
     def download_file(self):
         self.filename = self.url[self.url.rfind("/")+1:]
         self.save_as = os.path.join(default_download_path, self.filename)
-
+        printProgressBar(0, 100)
         try:
             self.status = 'downloading'
             urllib.request.urlretrieve(self.url, self.save_as, self.progress_file)
@@ -56,14 +61,16 @@ class DownloadItem():
         readsofar = blocknum * blocksize
         if totalsize > 0:
             self.progress = readsofar * 100 / totalsize
-            print(self.progress)
+
+            printProgressBar(int(self.progress), 100)
 
 
     def progress_video(self, stream, chunk, bytes_remaining):
         total_size = stream.filesize
         bytes_downloaded = total_size - bytes_remaining 
         self.progress = bytes_downloaded / total_size * 100
-        print(self.progress)
+
+        printProgressBar(int(self.progress), 100)
 
 
 
@@ -82,6 +89,6 @@ if __name__ == "__main__":
     print(f'is video: {video}')
 
     item = DownloadItem(url, video=video)
-    print(item.status)
+    # print(item.status)
     item.download()
-    print(item.filename)
+    # print(item.filename)
