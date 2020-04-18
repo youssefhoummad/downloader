@@ -1,35 +1,50 @@
 import os
 import urllib.request
 
-from pytube import YouTube
+from pytube import YouTube, Playlist
 
 from progress import printProgressBar
 
 
 default_download_path = os.path.expanduser(r'~\Downloads')
 
+default_resolution = "720p"
+
 
 class DownloadItem():
-    def __init__(self, url, video=False):
+    def __init__(self, url, mode='file'):
         self.url = url
         self.progress = 0
         self.filename = ''
         self.save_as = ''
         self.status = ''
-        self.is_video = video
+        self.mode = mode
 
 
 
     def download(self):
-        if self.is_video:
+        if self.mode in ('video', 'v', '-v'):
             self.download_video()
+
+        elif self.mode in ('playlist', 'p', '-p'):
+            self.download_playlist()
+
         else:
             self.download_file()
 
 
+    def download_playlist(self):
+        pl = Playlist(self.url)
+        
+        # print(pl.title)
+
+        for url in pl.video_urls:
+            self.url = url
+            self.download_video()
+ 
+
     def download_video(self):
-        df_res = '720p'
-        yt = YouTube(url)
+        yt = YouTube(self.url)
 
         self.filename = yt.title
         yt.register_on_progress_callback(self.progress_video)
@@ -38,7 +53,7 @@ class DownloadItem():
 
         try:
             self.status = 'downloading'
-            yt.streams.get_by_resolution(df_res).download(output_path=default_download_path)
+            yt.streams.get_by_resolution(default_resolution).download(output_path=default_download_path)
             self.status = 'complete'
         except:
             yt.streams.get_highest_resolution().download(output_path=default_download_path)
@@ -78,17 +93,22 @@ class DownloadItem():
 
 
 if __name__ == "__main__":
-    import sys
+    import sys, getopt
 
-    url = sys.argv[1]
+
+    try:
+        url = sys.argv[1]
+    except:
+        print("enter the url")
+
+
     if len(sys.argv) > 2:
-        video = True
+        mode = sys.argv[2]
     else:
-        video = False
-    
-    print(f'is video: {video}')
+        mode = 'file'
+ 
 
-    item = DownloadItem(url, video=video)
+    item = DownloadItem(url, mode=mode)
     # print(item.status)
     item.download()
     # print(item.filename)
