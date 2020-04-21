@@ -15,9 +15,10 @@ class DownloadItem():
     def __init__(self, url, mode='file'):
         self.url = url
         self.progress = 0
-        self.filename = ''
-        self.save_as = ''
-        self.status = ''
+        self.totalsize = None
+        self.filename = None
+        self.save_as = None
+        self.status = None
         self.mode = mode
 
 
@@ -35,8 +36,6 @@ class DownloadItem():
 
     def download_playlist(self):
         pl = Playlist(self.url)
-        
-        # print(pl.title)
 
         for url in pl.video_urls:
             self.url = url
@@ -50,14 +49,14 @@ class DownloadItem():
         yt.register_on_progress_callback(self.progress_video)
 
         printProgressBar(0, 100)
-
+    
         try:
             self.status = 'downloading'
             yt.streams.get_by_resolution(default_resolution).download(output_path=default_download_path)
             self.status = 'complete'
         except:
             yt.streams.get_highest_resolution().download(output_path=default_download_path)
-            # print(f'downloading highesrt resolution possible')
+            print(f'downloading highesrt resolution possible')
 
 
     def download_file(self):
