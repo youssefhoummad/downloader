@@ -92,10 +92,10 @@ class ThreadedApp(object):
   def end_application(self):
     pass
 
-  def save_to_db(dl):
+  def save_to_db(self, dl):
     DATABASE.append(dl)
   
-  def load_from_db():
+  def load_from_db(self):
     DATABASE = []
 
 if __name__ == '__main__':
