@@ -8,67 +8,52 @@ import tkinter as tk
 from tkinter import ttk
 
 from pySmartDL import SmartDL
-from pytube import YouTube
 
 
 try:
-  # from .win10toast import ToastNotifier
+  from .win10toast import ToastNotifier
   from .imageLabel import ImageLabel
   from .buttons import *
   from .constants import *
   from .utils import *
 except:
-  # from win10toast import ToastNotifier
+  from win10toast import ToastNotifier
   from imageLabel import ImageLabel
   from buttons import *
   from constants import *
   from utils import *
 
-
+toaster = ToastNotifier()
 
 class DownloadItem(tk.Frame):
-  # def __init__(self, parent, dl, url, dst, filename=None, ext=None, size=None, progress=None, status=None):
-  def __init__(self, parent, **kwargs):
+  def __init__(self, parent, dl):
     tk.Frame.__init__(self, parent)
     self.config(bg=parent['bg'])
     self.parent = parent
 
-    self.dl_object = kwargs.get('dl', None)
-
-    # all this variable for youtube link
-    self.url = kwargs.get('url', None)
-    self.dst = kwargs.get('dst', None)
-    self.ext = kwargs.get('ext', None)
-    self.name = kwargs.get('filename', None)
-
+    # self.url =s url
+    # self.dl_object = dl
     
     self.progress = tk.StringVar()
-    self.progress.set(kwargs.get('progress', None) or '0%')
+    self.progress.set('0%')
     self.speed = tk.StringVar()
     self.speed.set('-- kB/s')
     self.size = tk.StringVar()
-    self.size.set(size or '-- MB')
+    self.size.set('-- MB')
     self.time = tk.StringVar()
     self.time.set('-m -s')
 
-    self.init_UI()
-
-    if self.progress.get() == '100%':
-      self._pause.config(images=[r'.\img\points.tif', r'.\img\pointsHover.tif', r'.\img\pointsPress.tif'])
-      self._pause.command = lambda : open_path(dst, DEST)
-      self.update_idletasks()
-
-
+    # self.init_UI()
     
 
   def init_UI(self):
     _f = tk.Frame(self, bg=self['bg'])
     _f.pack(ipady=3)
 
-    self.ico = get_icon(self.ext or self.extension)
+    self.ico = get_icon(self.extension)
     self._icon = tk.Label(_f, text="", image=self.ico, bg=self['bg'])
     # self._progress = ttk.Progressbar(_f, length=100)
-    self._name = tk.Label(_f, text=(self.name or self.filename), bg=self['bg'], width=26, anchor='nw')
+    self._name = tk.Label(_f, text=self.filename, bg=self['bg'], width=26, anchor='nw')
     self._progress = tk.Label(_f, textvariable=self.progress, bg=self['bg'], width=8)
     self._speed = tk.Label(_f, textvariable=self.speed, bg=self['bg'], width=10)
     self._size = tk.Label(_f, textvariable=self.size, bg=self['bg'], width=10)
@@ -104,6 +89,13 @@ class DownloadItem(tk.Frame):
 
     @threaded
     def show_progress():
+
+      while not self.dl_object: continue
+
+      while not hasattr(self.dl_object, 'get_speed'): continue
+      
+      self.init_UI()
+
       while not self.dl_object.isFinished():
         try:
           self.speed.set(self.dl_object.get_speed(human=True))
@@ -114,7 +106,9 @@ class DownloadItem(tk.Frame):
         except Exception as e:
           print(e)
 
-        time.sleep(0.2)  
+    
+        time.sleep(0.2)
+  
         self.update_idletasks()
 
       if self.dl_object.isFinished():
@@ -123,47 +117,38 @@ class DownloadItem(tk.Frame):
         self.size.set(self.dl_object.get_final_filesize(human=True))
         # self._progress['value'] = 100 
         self.progress.set('100%')
+  
 
         self._pause.config(images=[r'.\img\points.tif', r'.\img\pointsHover.tif', r'.\img\pointsPress.tif'])
         self._pause.command = lambda : open_path(self.dl_object.get_dest(), DEST)
 
         self.update_idletasks()
 
-        # saved it in DATABASE
-        if not self in DATABASE:
-          print('------ add dl_ui to DATABASE ----------')
-          print('------ here must be dl_ui >> dl_obj ----------')
-          DATABASE.append(self)
-
 
 
         # show system notification 
-        toaster.show_toast(
-          "download completed",
-          f"{self.filename} downloaded",
-          icon_path=APP_ICO,
-          callback_on_click=lambda a=None:open_path(self.dl_object.get_dest(), DEST),
-          duration=10,
-          threaded=True
-            )
+        toaster.show_toast("download completed",
+                  f"{self.filename} downloaded",
+                  icon_path=APP_ICO,
+                  callback_on_click=lambda a=None:open_path(self.dl_object.get_dest(), DEST),
+                  duration=10,
+                  threaded=True)
 
     start_downloading()
     show_progress()
   
-
   def cancel_download(self):
     if self.dl_object:
       self.dl_object.stop()
       # DATABASE.remove(self)
-    self.destroy()
+      self.destroy()
 
 
   def pause_download(self):
     # print('pause Download..')
-    if self.dl_object:
-      self.dl_object.pause()
-      self._pause.config(images=PLAY_IMAGES)
-      self._pause.command = self.resume_download
+    self.dl_object.pause()
+    self._pause.config(images=PLAY_IMAGES)
+    self._pause.command = self.resume_download
 
 
   def resume_download(self):
@@ -180,28 +165,13 @@ class DownloadItem(tk.Frame):
 
   @property
   def extension(self):
-    # pre define exitension
-    if self.ext:
-      return self.ext
-    # find extension
-    try: 
-      return os.path.splitext(self.url)[1]
-    except:
-      return os.path.splitext(self.dst)[1]
-    # dest = self.dl_object.get_dest()
-    # return os.path.splitext(dest)[1]
+    dest = self.dl_object.get_dest()
+    return os.path.splitext(dest)[1]
 
   @property
   def filename(self):
-    if self.name: return self.name
-    if self.url.endswith(f'.{self.extension[1:]}'):
-      head, tail = ntpath.split(self.url)
-      return tail or ntpath.basename(head)
-    head, tail = ntpath.split(self.dst)
+    head, tail = ntpath.split(self.dl_object.get_dest())
     return tail or ntpath.basename(head)
-
-    # head, tail = ntpath.split(self.dl_object.get_dest())
-    # return tail or ntpath.basename(head)
 
 
 # if __name__ == "__main__":

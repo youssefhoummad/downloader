@@ -1,10 +1,10 @@
+import tkinter as tk, threading, queue, os
 
-
-import tkinter as tk, threading, queue
+from pySmartDL import SmartDL
 
 from gui import GuiApp
-from src.utils import threaded
-from src.downloadItem import *
+from src import *
+
 
 
 class ThreadedApp(object):
@@ -23,10 +23,13 @@ class ThreadedApp(object):
     # Create the queue
     self.queue = queue.Queue()
 
-    self.load_from_db()
+
+
+    # self.load_from_db()
 
     # Set up the GUI part
     self.gui = GuiApp(master, self.queue, self.download)
+
 
     # Set up the thread to do asynchronous I/O
     # More threads can also be created and used, if necessary
@@ -34,6 +37,11 @@ class ThreadedApp(object):
     
     # Start the periodic call in the GUI to check the queue
     self.periodic_call()
+
+
+    self.display_old_downloads()
+
+
 
 
   def periodic_call(self):
@@ -46,6 +54,22 @@ class ThreadedApp(object):
     #   import sys
     #   self.master.destroy()
     #   sys.exit(1)
+
+
+  def display_old_downloads(self):
+    if DATABASE:
+      self.gui.remove_no_item_label()
+
+      for dl_object in DATABASE:
+        DownloadItem(self.gui.downloadsFrame, 
+            dl=None, 
+            url = dl_object.url,
+            dst= dl_object.dst,
+            filename= dl_object.filename, 
+            ext = dl_object.extension,
+            progress = dl_object.progress,
+            size = dl_object.size
+            ).grid(row=len(self.gui.downloadsFrame.grid_slaves()), column=0)
 
 
   @threaded
@@ -64,23 +88,31 @@ class ThreadedApp(object):
       # store url in variable <url>
       url = self.gui.url.get()
 
+
+
+      dst, ext, filename= DEST, None, None
+      if is_youtube_link(url):
+        url, dst, name = youtube_direct_link(url)
+        ext = '.mp4'
+
+
       # remove <No item Found> from interface
       self.gui.remove_no_item_label()
 
+      options = {'url':url, 'dsrt':dst, "filename":filename, 'extension':ext }
+
+      dl_ui = DownloadItem(self.gui.downloadsFrame, dl=None, url=url, dst=dst, filename=filename, ext=ext)
+      dl_ui.grid(row=len(self.gui.downloadsFrame.grid_slaves()), column=0)
+
+      
+      print('------ add dl_ui to DATABASE ----------')
+      DATABASE.append(dl_ui)
+
       try:
         # create download object
-        self.dl_object = SmartDL(url, DEST, progress_bar=False)
+        dl_ui.dl_object = SmartDL(url, dst, progress_bar=False)
       except Exception as e:
-        print(f"------> {e}")
-        # print(f"object error ---> {self.dl_object.get_errors()}")
-
-      # create interface of dowload object
-      dl_ui = DownloadItem(self.gui.downloadsFrame, dl=self.dl_object)
-      dl_ui.grid(row=len(self.gui.downloadsFrame.grid_slaves()), column=0)
-      
-      # store download object in database or file...\s
-      # must be saved dl_object not dl_ui
-      self.save_to_db(dl_ui)
+        raise e
 
       # start download
       dl_ui.start()
@@ -89,23 +121,13 @@ class ThreadedApp(object):
       self.gui.unable_input()
 
 
-  def end_application(self):
-    pass
-
-  def save_to_db(self, dl):
-    DATABASE.append(dl)
-  
-  def load_from_db(self):
-    DATABASE = []
 
 if __name__ == '__main__':
-
   root = tk.Tk()
   root.geometry('800x500')
   root.resizable(False, False)
   root.title('Downloader')
   root.iconbitmap(APP_ICO)
-
+  # root.protocol('WM_DELETE_WINDOW', doSomething) #ovveride x button in titlebar
   App = ThreadedApp(root)
-
   root.mainloop()

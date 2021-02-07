@@ -1,5 +1,10 @@
 import os
-
+try:
+  from .database import Database
+  from .win10toast import ToastNotifier
+except:
+  from database import Database
+  from win10toast import ToastNotifier
 
 IMAGES_EXT = [ '.jpg', 'jpeg', '.png', '.gif', '.webp', '.tiff', '.psd', '.raw', '.bmp', '.heif', '.indd', '.jpeg', '.svg', '.ai', '.eps']
 
@@ -17,24 +22,12 @@ PLAY_IMAGES = [r'.\img\play.tif', r'.\img\playHover.tif',r'.\img\playPress.tif']
 
 OPEN_IMAGES = [r'.\img\points.tif', r'.\img\pointsHover.tif',r'.\img\pointsPress.tif']
 
-ZIP_ICO = r'.\img\zip.png'
-
-ARCHIVE_ICO = r'.\img\archive.png'
-
-PDF_ICO = r'.\img\pdf.png'
-
-IMAGE_ICO = r'.\img\image.png'
-
-VIDEO_ICO = r'.\img\video.png'
-
-AUDIO_ICO = r'.\img\audio.png'
-
-FILE_ICO = r'.\img\file.png'
-
 SEARCH_ICO = r'.\img\search.tif'
 
 APP_ICO = r'.\img\icon.ico'
 
 DEST = os.path.expanduser(r'~\Downloads')
 
-DATABASE = []
+toaster = ToastNotifier()
+
+DATABASE = Database()

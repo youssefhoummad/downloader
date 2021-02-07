@@ -36,7 +36,7 @@ class ButtonSidebar(Frame):
     self._bgDisable = parent['bg']
 
     self.mainFrame = Frame(self, bg=self._bg)
-    self.mainFrame.pack(fill='x', expand=True)
+    self.mainFrame.pack(fill='x')
 
 
     self.border = Frame(self.mainFrame, width=5, bg=self._bg)
@@ -85,7 +85,7 @@ class ButtonSidebar(Frame):
     return ImageTk.PhotoImage(ico)
 
 
-  def on_enter(self, event):
+  def on_enter(self, event=None):
     if not self.disabeld:
       self.mainFrame.config(bg=self._bgHover)
       self.icon.config(image=self._icoHover, bg=self._bgHover)
@@ -93,7 +93,7 @@ class ButtonSidebar(Frame):
       self.text.config(bg=self._bgHover, fg=self._fgHover)
     
 
-  def on_leave(self, event):
+  def on_leave(self, event=None):
     if not self.disabeld:
       self.mainFrame.config(bg=self._bg)
       self.icon.config(image=self._ico, bg=self._bg)
@@ -101,7 +101,7 @@ class ButtonSidebar(Frame):
       self.text.config(bg=self._bg, fg=self._fg)
 
 
-  def on_press(self, event):
+  def on_press(self, event=None):
     if not self.disabeld:
       self.mainFrame.config(bg=self._bgPress)
       self.icon.config(image=self._icoPress, bg=self._bgPress)
@@ -109,14 +109,14 @@ class ButtonSidebar(Frame):
       self.text.config(bg=self._bgPress, fg=self._fgPress)
 
 
-  def on_release(self, event):
+  def on_release(self, event=None):
     # if self['state']!="disabled":
     if not self.disabeld:
       self.on_enter(event=None)
       if self.command: self.command()
   
-  def on_doubleClick(self, event):
-    pass
+  def on_doubleClick(self, event=None):
+    self.on_press()
 
 
   def on_disable(self, event=None):

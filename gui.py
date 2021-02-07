@@ -1,13 +1,7 @@
+import tkinter as tk
 
-from src.constants import *
-from src.utils import *
-from src.tkscrolledframe import *
-from src.cardFrame import * 
-from src.buttons import *
-from src.sidebarItem import *
-from src.downloadItem import *
-from src.customEntry import EntryWidthValidator
-from src.customEntry import SearchEntry
+from src import *
+
 
 
 class GuiApp(tk.Frame):
@@ -18,6 +12,7 @@ class GuiApp(tk.Frame):
     # Set up the GUI
     # Add more GUI stuff here depending on your specific needs
     self.download_command = download_command
+    self.temp_db = []
     
     self.url = tk.StringVar()
 
@@ -56,11 +51,11 @@ class GuiApp(tk.Frame):
     self.searchEntry = SearchEntry(self.sidebar, on_change=self.search)
     self.searchEntry.pack(fill='x', padx=(20,10), pady=20)
 
-    btn_all = ButtonSidebar(self.sidebar, text='All', icons=[r'img\all.tif'], command=lambda :self.filter(None))
+    btn_all = ButtonSidebar(self.sidebar, text='All', icons=[r'img\all.tif', r'img\allHover.tif', r'img\allPress.tif'], command=lambda :self.filter(None))
     btn_all.pack(fill='x')
 
-    btn_downloading = ButtonSidebar(self.sidebar, text='downloding', icons=[r'img\download.tif', r'img\downloadHover.tif'], command=lambda :self.filter('downloding'))
-    btn_downloading.pack(fill='x')
+    # btn_downloading = ButtonSidebar(self.sidebar, text='downloding', icons=[r'img\download.tif', r'img\downloadHover.tif', r'img\downloadPress.tif'], command=lambda :self.filter('downloding'))
+    # btn_downloading.pack(fill='x')
 
     btn_finished = ButtonSidebarWithChildrens(self.sidebar, text='Finished', icons=[r'img\ok.tif', r'img\okHover.tif'], command=lambda :self.filter('finished'))
     btn_finished.pack(fill='x', expand=True)
@@ -76,8 +71,12 @@ class GuiApp(tk.Frame):
 
     btn_finished.pack_childrens()
 
-    btn_unfinished = ButtonSidebar(self.sidebar, text='Unfinished', icons=[r'img\ban.tif', r'img\banHover.tif'], command=lambda :self.filter('unfinished'))
+    btn_unfinished = ButtonSidebar(self.sidebar, text='Unfinished', icons=[r'img\ban.tif', r'img\banHover.tif', r'img\banPress.tif'], command=lambda :self.filter('unfinished'))
     btn_unfinished.pack(fill='x')
+
+    btn_settings = ButtonSidebar(self, text='Settings', icons=[r'img\settings.tif', r'img\settingsHover.tif',r'img\settingsPress.tif'], command=lambda :self.filter('unfinished'))
+    # btn_settings.pack(side='bottom', fill='x')
+    btn_settings.place(x=0, y=468, width=180)
 
   
   def mainarea_init(self):
@@ -149,8 +148,10 @@ class GuiApp(tk.Frame):
       return
 
     for i, item in enumerate(filterd):
-      try: item.grid(row=i, column=0)
-      except: pass
+      try: 
+        item.grid(row=i, column=0)
+      except: 
+        DownloadItem(self.downloadsFrame, None, *item.args).grid(row=i, column=0)
 
 
   def filter(self, by=None):
@@ -176,8 +177,21 @@ class GuiApp(tk.Frame):
       return
     
     for i, item in enumerate(filterd):
-      item.grid(row=i, column=0)
+      try:
+        item.grid(row=i, column=0)
+      except:
+        DownloadItem(self.downloadsFrame, None, *item.args).grid(row=i, column=0)
       # print(item.filename)
   
+
+if __name__ == '__main__':
+  root = tk.Tk()
+  app = GuiApp(root, queue=None, download_command=None)
+  app.pack()
+  root.geometry('800x500')
+  root.resizable(False, False)
+  root.title('Downloader')
+  root.iconbitmap(APP_ICO)
+  root.mainloop()
 
 

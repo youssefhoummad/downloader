@@ -1,8 +1,17 @@
-from os import path
+from os import path, remove
 import subprocess
 from threading import Thread
 from urllib.parse import urlparse
 import re
+
+from win32com.shell import shell, shellcon  
+from PIL import Image, ImageTk  
+import win32api  
+import win32con  
+import win32ui  
+import win32gui 
+
+from pytube import YouTube
 
 try:
   from constants import *
@@ -10,27 +19,60 @@ except:
   from .constants import *
 
 
-def render_icon_file(ext):
+def threaded(fn):
+    """To use as decorator to make a function call threaded.
+    Needs import
+    from threading import Thread"""
+    def wrapper(*args, **kwargs):
+        thread = Thread(target=fn, args=args, kwargs=kwargs)
+        thread.start()
+        return thread
+    return wrapper
 
-  file_types = {
-                '.zip':ZIP_ICO, 
 
-                '.7z':ARCHIVE_ICO, 
-                '.rar':ARCHIVE_ICO, 
-                '.sfx':ARCHIVE_ICO, 
 
-                '.pdf':PDF_ICO, 
 
-                '.jpg':IMAGE_ICO, 
-                '.jpeg':IMAGE_ICO, 
-                '.png':IMAGE_ICO, 
+def get_icon(ext, size='large'):  
 
-                '.mp4':VIDEO_ICO, 
-                '.mkv':VIDEO_ICO, 
+  file = open(f"temp{ext}", "w") 
+  file.close() 
 
-                '.mp3':AUDIO_ICO, 
-              }
-  return file_types.get(ext.lower(), FILE_ICO)
+  PATH = f'temp{ext}'
+
+  SHGFI_ICON = 0x000000100  
+  SHGFI_ICONLOCATION = 0x000001000  
+  if size == "small":  
+    SHIL_SIZE= 0x00001  
+  elif size == "large":  
+    SHIL_SIZE= 0x00002  
+  else:  
+    raise TypeError("Invalid argument for 'size'. Must be equal to 'small' or 'large'")  
+  ret, info = shell.SHGetFileInfo(PATH, 0, SHGFI_ICONLOCATION | SHGFI_ICON | SHIL_SIZE)  
+  hIcon, iIcon, dwAttr, name, typeName = info  
+  ico_x = win32api.GetSystemMetrics(win32con.SM_CXICON)  
+  hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))  
+  hbmp = win32ui.CreateBitmap()  
+  hbmp.CreateCompatibleBitmap(hdc, ico_x, ico_x)  
+  hdc = hdc.CreateCompatibleDC()  
+  hdc.SelectObject(hbmp)  
+  hdc.DrawIcon((0, 0), hIcon)  
+  win32gui.DestroyIcon(hIcon)  
+  
+  bmpinfo = hbmp.GetInfo()  
+  bmpstr = hbmp.GetBitmapBits(True)  
+  img = Image.frombuffer(  
+    "RGBA",  
+    (bmpinfo["bmWidth"], bmpinfo["bmHeight"]),  
+    bmpstr, "raw", "BGRA", 0, 1  
+  )  
+
+  remove(PATH)
+  
+  if size == "small":  
+    img = img.resize((16, 16), Image.ANTIALIAS)  
+
+  img = ImageTk.PhotoImage(img)
+  return img
 
 
 def is_downloaded(url, dst):
@@ -85,13 +127,22 @@ def validator(url, dst=DEST):
   return 0
 
 
+def youtube_direct_link(url):
+  yt = YouTube(url)
+  url = yt.streams.first().url
+    
+  title = yt.streams[0].title
+  try:
+    title = title[:20].replace(' ', '_') + '.mp4'
+  except:
+    title = title.replace(' ', '_') + '.mp4'
 
-def threaded(fn):
-    """To use as decorator to make a function call threaded.
-    Needs import
-    from threading import Thread"""
-    def wrapper(*args, **kwargs):
-        thread = Thread(target=fn, args=args, kwargs=kwargs)
-        thread.start()
-        return thread
-    return wrapper
+  dst = os.path.join(DEST, title)
+  
+  return url, dst, title
+
+
+
+
+if __name__ == '__main__':
+  get_icon('zip')
