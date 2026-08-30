@@ -3,23 +3,9 @@
 
 import sys
 
-try:
-    # Python 3
-    import tkinter as tk
-except (ImportError):
-    # Python 2
-    import Tkinter as tk
+import tkinter as tk
+import tkinter.ttk as ttk
 
-try:
-    try:
-        # Python 3
-        import tkinter.ttk as ttk
-    except (ImportError):
-        # Python 2
-        import ttk
-except (ImportError):
-    # Can't provide ttk's Scrollbar
-    pass
 
 
 __all__ = ["ScrolledFrame"]
@@ -55,6 +41,7 @@ class ScrolledFrame(tk.Frame):
 
         # Whether to fit the interior widget's width to the canvas
         self._fit_width = False
+        self._fit_height = False
 
         # Which scrollbars to provide
         if "scrollbars" in kw:
@@ -98,11 +85,15 @@ class ScrolledFrame(tk.Frame):
 
         # Enable scrolling when the canvas has the focus
         self.bind_arrow_keys(c)
-        self.bind_scroll_wheel(c)
+        # Wheel scrolling: bind globally, then route to this frame
+        # only when the pointer is over its content (see _on_wheel)
+        self._wheel_acc = 0
+        self.bind_all("<MouseWheel>", self._on_wheel, add="+")
+        self.bind_all("<Button-4>", self._on_wheel, add="+")
+        self.bind_all("<Button-5>", self._on_wheel, add="+")
 
-        # Call _resize_interior() when the canvas widget is updated
-        c.bind("<Configure>", self._resize_interior)
-
+        # Re-layout when the canvas is resized
+        c.bind("<Configure>", self._layout)
         # Scrollbars
         # xs = self._x_scrollbar = Scrollbar(self,
         #                                    orient="horizontal",
@@ -159,12 +150,6 @@ class ScrolledFrame(tk.Frame):
         # widget.bind("<Right>",
         #             lambda event: self._canvas.xview_scroll(1, "units"))
 
-    def bind_scroll_wheel(self, widget):
-        """Bind the specified widget's mouse scroll event to the canvas."""
-
-        widget.bind("<MouseWheel>", self._scroll_canvas)
-        widget.bind("<Button-4>", self._scroll_canvas)
-        widget.bind("<Button-5>", self._scroll_canvas)
 
     def cget(self, key):
         """Return the resource value for a KEY given as string."""
@@ -193,40 +178,30 @@ class ScrolledFrame(tk.Frame):
     # Also override this alias for configure()
     config = configure
 
-    def display_widget(self, widget_class, fit_width=False, **kw):
+    def display_widget(self, widget_class, fit_width=False, fit_height=False, **kw):
         """Create and display a new widget.
-        If fit_width == True, the interior widget will be stretched as
-        needed to fit the width of the frame.
-        Keyword arguments are passed to the widget_class constructor.
-        Returns the new widget.
-        """
 
-        # Blank the canvas
+        If fit_width == True, the interior widget will be stretched
+        as needed to fit the width of the frame.
+
+        If fit_height == True and the widget is shorter than the frame,
+        it will be centered vertically.
+        """
         self.erase()
 
-        # Set width fitting
         self._fit_width = fit_width
+        self._fit_height = fit_height
 
-        # Set the new interior widget
         self._interior = widget_class(self._canvas, **kw)
-
-        # Add the interior widget to the canvas, and save its widget ID
-        # for use in _resize_interior()
         self._interior_id = self._canvas.create_window(0, 0,
                                                        anchor="nw",
                                                        window=self._interior)
 
-        # Call _update_scroll_region() when the interior widget is resized
-        self._interior.bind("<Configure>", self._update_scroll_region)
+        # Re-layout whenever the interior widget is resized
+        self._interior.bind("<Configure>", self._layout)
 
-        # Fit the interior widget to the canvas if requested
-        # We don't need to check fit_width here since _resize_interior()
-        # already does.
-        self._resize_interior()
-
-        # Scroll to the top-left corner of the canvas
+        self._layout()
         self.scroll_to_top()
-
         return self._interior
 
     def erase(self):
@@ -245,6 +220,7 @@ class ScrolledFrame(tk.Frame):
 
         # Reset width fitting
         self._fit_width = False
+        self._fit_height = False
 
     def scroll_to_top(self):
         """Scroll to the top-left corner of the canvas."""
@@ -254,52 +230,93 @@ class ScrolledFrame(tk.Frame):
 
     # ------------------------------------------------------------------------
 
-    def _resize_interior(self, event=None):
-        """Resize the interior widget to fit the canvas."""
+    # Widgets that scroll themselves (don't double-scroll them)
+    _SELF_SCROLL_CLASSES = ("Text", "Listbox", "Treeview", "Entry",
+                            "Spinbox", "TCombobox", "TSpinbox")
 
-        if self._fit_width and self._interior_id:
-            # The current width of the canvas
-            canvas_width = self._canvas.winfo_width()
+    def _on_wheel(self, event):
+        """Scroll only if the pointer is over this frame's content."""
 
-            # The interior widget's requested width
-            requested_width = self._interior.winfo_reqwidth()
+        if event.widget.winfo_class() in self._SELF_SCROLL_CLASSES:
+            return  # let the widget handle its own scrolling
 
-            if requested_width != canvas_width:
-                # Resize the interior widget
-                new_width = max(canvas_width, requested_width)
-                self._canvas.itemconfigure(self._interior_id, width=new_width)
+        # Walk up from the widget under the pointer; scroll only
+        # if we reach our own canvas (pointer is over our content)
+        w = event.widget
+        while w is not None:
+            if w in (self._canvas, self._y_scrollbar):
+                self._scroll_canvas(event)
+                return
+            w = w.master
 
     def _scroll_canvas(self, event):
-        """Scroll the canvas."""
-
         c = self._canvas
 
-        if sys.platform.startswith("darwin"):
-            # macOS
-            c.yview_scroll(-1 * event.delta, "units")
-
-        elif event.num == 4:
-            # Unix - scroll up
+        if event.num == 4:
+            # Linux - wheel/touchpad up
             c.yview_scroll(-1, "units")
-
         elif event.num == 5:
-            # Unix - scroll down
+            # Linux - wheel/touchpad down
             c.yview_scroll(1, "units")
-
+        elif sys.platform.startswith("darwin"):
+            # macOS
+            c.yview_scroll(-event.delta, "units")
+        elif sys.platform.startswith("win"):
+            # Windows - one notch = 120, but touchpads send smaller
+            # deltas, so accumulate until we have a full notch.
+            # int() (not //) so positive and negative behave the same
+            self._wheel_acc += event.delta
+            clicks = int(self._wheel_acc / 120) # /120 speed of scrolling
+            if clicks:
+                self._wheel_acc -= clicks * 120
+                c.yview_scroll(-clicks, "units")
         else:
-            # Windows
-            c.yview_scroll(-1 * (event.delta // 120), "units")
+            # Linux with smooth scrolling (Tk 8.6.10+ / XInput2):
+            # many small deltas with event.num == 0
+            self._wheel_acc += event.delta
+            lines = int(self._wheel_acc / 15)
+            if lines:
+                self._wheel_acc -= lines * 15
+                c.yview_scroll(-lines, "units") # لعكس اتجاه التمرير نغير -lines ب lines
 
-    def _update_scroll_region(self, event):
-        """Update the scroll region when the interior widget is resized."""
+    def _layout(self, event=None):
+        """Position the interior widget and update the scroll region."""
 
-        # The interior widget's requested width and height
+        if not self._interior_id:
+            return
+
+        canvas_width = self._canvas.winfo_width()
+        canvas_height = self._canvas.winfo_height()
+
+        # Stretch the width to fit the canvas if requested
+        if self._fit_width:
+            req_width = self._interior.winfo_reqwidth()
+            self._canvas.itemconfigure(self._interior_id,
+                                       width=max(canvas_width, req_width))
+
+        # Center vertically when the content is shorter than the canvas
+        x, y = 0, 0
+        if self._fit_height:
+            req_height = self._interior.winfo_reqheight()
+            if req_height < canvas_height:
+                y = (canvas_height - req_height) // 2
+        self._canvas.coords(self._interior_id, x, y)
+
+        # Scroll region covers both the content and the visible area
         req_width = self._interior.winfo_reqwidth()
         req_height = self._interior.winfo_reqheight()
+        self._canvas.configure(scrollregion=(0, 0,
+                                             max(req_width, canvas_width),
+                                             max(req_height, canvas_height)))
+        
 
-        # Set the scroll region to fit the interior widget
-        self._canvas.configure(scrollregion=(0, 0, req_width, req_height))
-
+    def interior(self, fit_width=False, fit_height=False):
+        """أعد الإطار الداخلي الجاهز لحزم الأدوات فيه مباشرة."""
+        if self._interior is None:
+            self.display_widget(tk.Frame,
+                                fit_width=fit_width,
+                                fit_height=fit_height)
+        return self._interior
     # ------------------------------------------------------------------------
 
     # Keys for configure() to forward to the canvas widget
